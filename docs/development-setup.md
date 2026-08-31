@@ -40,3 +40,16 @@ databases. The development database is upgraded once and is not downgraded after
 
 Alembic owns schema changes. Import/startup is non-mutating and never runs migrations
 automatically. This project performs no production WordPress writes.
+
+## Offline Directorist adapter tests
+
+Gate 4 uses only `backend/tests/fixtures/directorist_listing_v1.json`, copied byte-for-byte
+from the approved documentation fixture with a frozen SHA-256 assertion. HTTP behavior is
+exercised through `httpx.MockTransport`; no test contacts a live host.
+
+The read-only client supports listing pages, individual listings, directories, categories,
+and locations. It has explicit timeouts, bounded transient retries, response-size and JSON
+checks, safe pagination, redirect rejection, and no authorization/cookie configuration.
+Taxonomy mapping is injected rather than hard-coded. Currency stays unknown, zero price is
+uninterpreted, and contact visibility is enforced before public projection. No Gate 4
+command writes to WordPress or PostgreSQL.

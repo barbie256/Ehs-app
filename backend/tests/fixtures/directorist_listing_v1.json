@@ -1,0 +1,95 @@
+{
+  "fixture_version": "1.0",
+  "fixture_purpose": "Representative Directorist v1 listing response for adapter tests",
+  "synthetic": true,
+  "contains_real_credentials": false,
+  "contains_real_personal_contact_data": false,
+  "source_schema_observed_at": "2026-08-31T13:24:01Z",
+  "records": [
+    {
+      "id": 900001,
+      "name": "Sample Construction Material",
+      "slug": "sample-construction-material",
+      "permalink": "https://example.invalid/directory/sample-construction-material/",
+      "date_created": "2026-08-01T09:00:00",
+      "date_created_gmt": "2026-08-01T06:00:00",
+      "date_modified": "2026-08-20T11:30:00",
+      "date_modified_gmt": "2026-08-20T08:30:00",
+      "description": "<p>Synthetic description used only for automated tests.</p>",
+      "short_description": "Synthetic listing fixture.",
+      "tagline": "Test data only",
+      "status": "publish",
+      "author": 90001,
+      "directory": 3,
+      "categories": [
+        {
+          "id": 29,
+          "name": "Cement",
+          "slug": "cement",
+          "icon": ""
+        }
+      ],
+      "locations": [
+        {
+          "id": 51,
+          "name": "Kampala",
+          "slug": "kampala"
+        }
+      ],
+      "tags": [],
+      "address": "Synthetic address",
+      "zip": "",
+      "latitude": "0.000000",
+      "longitude": "32.000000",
+      "map_hidden": false,
+      "price": 50000,
+      "price_range": "",
+      "pricing_type": "price",
+      "email": "",
+      "phone": "",
+      "phone_2": "",
+      "fax": "",
+      "website": "",
+      "video_url": "",
+      "social_links": null,
+      "owner_contact_hidden": true,
+      "images": [
+        {
+          "id": 990001,
+          "name": "synthetic-listing-image",
+          "src": "https://example.invalid/media/synthetic-listing-image.jpg",
+          "alt": "Synthetic construction material",
+          "position": 0,
+          "date_created": "2026-08-01T09:00:00",
+          "date_created_gmt": "2026-08-01T06:00:00",
+          "date_modified": "2026-08-01T09:00:00",
+          "date_modified_gmt": "2026-08-01T06:00:00"
+        }
+      ],
+      "featured": false,
+      "popular": false,
+      "new": false,
+      "never_expired": true,
+      "date_expired": "",
+      "reviews_allowed": true,
+      "average_rating": 0,
+      "rating_count": 0,
+      "views_count": 0,
+      "menu_order": 0,
+      "plan": 0,
+      "related_ids": [],
+      "_links": {
+        "self": [
+          {
+            "href": "https://example.invalid/wp-json/directorist/v1/listings/900001"
+          }
+        ],
+        "collection": [
+          {
+            "href": "https://example.invalid/wp-json/directorist/v1/listings"
+          }
+        ]
+      }
+    }
+  ]
+}

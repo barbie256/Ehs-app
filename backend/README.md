@@ -18,3 +18,18 @@ and same-marketplace parent validation remain documented service responsibilitie
 self-parenting is prevented by database checks.
 
 See `docs/development-setup.md` for safe local commands. No command writes to WordPress.
+
+## Gate 4 read-only Directorist adapter
+
+`app.integrations.directorist` contains strict v1 source schemas, a pure normalized mapper,
+and an asynchronous client exposing only listing pages, individual listings, directories,
+categories, and locations. It can issue only GETs to fixed v1 paths. Redirects,
+non-JSON/oversized responses, unsafe pagination, and schema failures are rejected;
+connection, timeout, and selected transient 5xx retries are narrowly bounded.
+
+Tests use HTTPX mock transports and the reviewed synthetic fixture only. Gate 4 has no live
+smoke test, website write, persistence, or synchronization behavior. Taxonomy resolution is
+injected through a protocol; unknown categories remain pending and incompatible marketplace
+mappings fail safely. Currency remains null, `price=0` is preserved without interpretation,
+hidden contacts are discarded, and visible contacts never appear in summaries. Upstream
+HTML is sanitized with a small allowlist before normalization.
