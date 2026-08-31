@@ -38,8 +38,9 @@ class Settings(BaseSettings):
 
     app_env: AppEnvironment = AppEnvironment.DEVELOPMENT
     database_url: SecretStr = SecretStr(
-        "postgresql://ehs_app:replace-with-local-password@localhost:5432/ehs_app"
+        "postgresql+psycopg://ehs_mall_local:replace-with-local-password@127.0.0.1:5432/ehs_mall_dev"
     )
+    test_database_url: SecretStr | None = None
     directorist_base_url: str = "https://ehsmall.com"
     directorist_api_version: str = "v1"
     directorist_request_timeout_seconds: Annotated[float, Field(ge=1, le=60)] = 10
