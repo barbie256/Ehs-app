@@ -1,0 +1,68 @@
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Python virtual environments, bytecode, and tooling caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Build and packaging outputs
+build/
+dist/
+*.egg-info/
+
+# Databases, dumps, and backups
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.backup
+*.wpress
+
+# Sensitive WordPress material and archives
+wp-config.php
+ehsmall.zip
+wordpress/
+wp-admin/
+wp-includes/
+wp-content/
+uploads/
+**/wp-admin/
+**/wp-includes/
+**/wp-content/
+**/uploads/
+
+# Private keys and certificates
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# IDE-local settings
+.idea/
+.vscode/
+*.code-workspace
+*.suo
+*.user
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
