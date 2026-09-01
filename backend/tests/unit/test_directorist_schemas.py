@@ -45,6 +45,56 @@ def test_zero_price_is_preserved() -> None:
     assert DirectoristListingV1.model_validate(record).price == Decimal(0)
 
 
+@pytest.mark.parametrize("field", ["latitude", "longitude"])
+@pytest.mark.parametrize("value", ["", " ", "\t\r\n"])
+def test_empty_or_whitespace_coordinate_is_missing(field: str, value: str) -> None:
+    record = fixture_record()
+    record[field] = value
+    item = DirectoristListingV1.model_validate(record)
+    assert getattr(item, field) is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    [
+        ("latitude", 0, Decimal(0)),
+        ("longitude", "0.000000", Decimal(0)),
+        ("latitude", "12.345", Decimal("12.345")),
+        ("latitude", "-12.345", Decimal("-12.345")),
+        ("latitude", "-90", Decimal("-90")),
+        ("latitude", "90", Decimal("90")),
+        ("longitude", "-180", Decimal("-180")),
+        ("longitude", "180", Decimal("180")),
+    ],
+)
+def test_valid_coordinates_remain_decimal(field: str, value: object, expected: Decimal) -> None:
+    record = fixture_record()
+    record[field] = value
+    item = DirectoristListingV1.model_validate(record)
+    assert getattr(item, field) == expected
+    assert isinstance(getattr(item, field), Decimal)
+
+
+@pytest.mark.parametrize("field", ["latitude", "longitude"])
+@pytest.mark.parametrize("value", ["malformed", True, [], {}, "NaN", "Infinity", "-Infinity"])
+def test_unsupported_nonempty_coordinates_remain_rejected(field: str, value: object) -> None:
+    record = fixture_record()
+    record[field] = value
+    with pytest.raises(ValidationError) as captured:
+        DirectoristListingV1.model_validate(record)
+    error_types = {detail["type"] for detail in captured.value.errors(include_input=False)}
+    assert error_types.intersection({"decimal_parsing", "decimal_type", "finite_number"})
+
+
+@pytest.mark.parametrize("field", ["latitude", "longitude"])
+def test_malformed_coordinate_preserves_decimal_parsing_error(field: str) -> None:
+    record = fixture_record()
+    record[field] = "not-empty-and-not-numeric"
+    with pytest.raises(ValidationError) as captured:
+        DirectoristListingV1.model_validate(record)
+    assert captured.value.errors(include_input=False)[0]["type"] == "decimal_parsing"
+
+
 @pytest.mark.parametrize("field", ["id", "name", "slug", "permalink", "status"])
 def test_required_identity_fields_are_rejected_when_missing(field: str) -> None:
     record = fixture_record()

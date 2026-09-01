@@ -76,6 +76,42 @@ def test_complete_success_has_exact_events_counts_and_closure() -> None:
     assert transport.closed
 
 
+def test_blank_coordinates_validate_normalize_and_preserve_output_allowlists() -> None:
+    first = copy.deepcopy(LISTING)
+    second = copy.deepcopy(LISTING)
+    first.update({"latitude": "", "longitude": "   "})
+    second.update({"latitude": "\t", "longitude": "\r\n"})
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/listings"):
+            return httpx.Response(
+                200,
+                json=[first, second],
+                headers={
+                    "content-type": "application/json",
+                    "X-WP-Total": "2",
+                    "X-WP-TotalPages": "1",
+                },
+                request=request,
+            )
+        return response_for(request)
+
+    code, events, transport, output = execute(handler)
+    listing = next(
+        event
+        for event in events
+        if event["event"] == "endpoint_completed" and event["endpoint"] == "listings"
+    )
+    assert code == 0
+    assert listing["validation_count"] == 2
+    assert listing["normalization_count"] == 2
+    assert listing["currency_null"] is True
+    assert listing["summary_private_fields_excluded"] is True
+    assert set(listing) <= probe.EVENT_KEYS["endpoint_completed"]
+    assert "validation_diagnostics" not in output
+    assert transport.closed
+
+
 def test_failure_before_client_construction_still_finishes() -> None:
     def fail_factory(_: probe.GuardedProbeTransport) -> probe.ProbeClient:
         raise RuntimeError("synthetic")

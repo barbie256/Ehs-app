@@ -11,8 +11,14 @@ def empty_to_none(value: object) -> object:
     return None if value == "" else value
 
 
+def empty_coordinate_to_none(value: object) -> object:
+    """Treat only absent Directorist coordinate strings as missing."""
+    return None if isinstance(value, str) and not value.strip() else value
+
+
 OptionalDate = Annotated[datetime | None, BeforeValidator(empty_to_none)]
 OptionalHttpUrl = Annotated[HttpUrl | None, BeforeValidator(empty_to_none)]
+OptionalCoordinate = Annotated[Decimal | None, BeforeValidator(empty_coordinate_to_none)]
 
 
 class SourceModel(BaseModel):
@@ -62,8 +68,8 @@ class DirectoristListingV1(SourceModel):
     tags: list[SourceTaxonomy] = Field(default_factory=list)
     address: str | None = None
     zip: str | None = None
-    latitude: Decimal | None = None
-    longitude: Decimal | None = None
+    latitude: OptionalCoordinate = None
+    longitude: OptionalCoordinate = None
     map_hidden: bool = False
     price: Decimal | None = None
     price_range: str | None = None

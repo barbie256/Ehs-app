@@ -122,6 +122,26 @@ def test_coordinate_ranges_are_enforced_and_zero_price_preserved() -> None:
     assert map_listing(source(price=0), FakeResolver({})).price == 0
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("latitude", "90.0001"),
+        ("latitude", "-90.0001"),
+        ("longitude", "180.0001"),
+        ("longitude", "-180.0001"),
+    ],
+)
+def test_coordinate_ranges_remain_enforced(field: str, value: str) -> None:
+    with pytest.raises(DirectoristSchemaError):
+        map_listing(source(**{field: value}), FakeResolver({}))
+
+
+def test_missing_coordinates_normalize_without_invention() -> None:
+    normalized = map_listing(source(latitude="  ", longitude=""), FakeResolver({}))
+    assert normalized.latitude is None
+    assert normalized.longitude is None
+
+
 def test_public_summary_and_detail_allowlists() -> None:
     normalized = map_listing(
         source(owner_contact_hidden=False, email="synthetic@example.invalid"),
