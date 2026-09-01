@@ -79,3 +79,34 @@ does not create or migrate schema. Run Alembic separately before an approved syn
 Exit codes are: `0` success, `2` overlap skipped, `3` partial item failures, `10` unsafe or
 invalid configuration, `11` database failure, `12` Directorist failure, and `13` another
 controlled failure. Partial and failed runs never archive unseen listings.
+
+## Offline verification of the read-only probe
+
+Gate 5B-R1 adds a database-free probe module intended for a separately approved live dry
+run. Its future command is:
+
+```powershell
+cd backend
+.venv/Scripts/python.exe -u -m app.jobs.probe_directorist_readonly
+```
+
+Do not run that command until Gate 5B-R2 explicitly authorizes live access. The command is
+fixed to four HTTPS GET attempts against the approved Directorist v1 paths on `ehsmall.com`.
+It has no CLI configuration, database access, persistence, retries, redirects, credentials,
+cookies, extra pagination, or record follow-up. The total deadline is 45 seconds.
+
+Safe flushed JSON-line events distinguish start, attempt, successful validated response,
+controlled failure stage, and final aggregate. Only aggregate counts, byte sizes, durations,
+approved pagination totals, invariant booleans, and controlled codes are emitted. Exit code
+`0` means all four endpoints passed, `12` means a controlled upstream or validation failure,
+and `13` means an internal or cleanup failure.
+
+Run its offline scenarios with:
+
+```powershell
+backend/.venv/Scripts/python.exe -m pytest `
+  backend/tests/integration/test_directorist_probe.py `
+  backend/tests/unit/test_directorist_probe_safety.py
+```
+
+These tests use only `httpx.MockTransport` and synthetic fixtures.

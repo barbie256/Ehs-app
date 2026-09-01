@@ -56,3 +56,28 @@ The existing `last_synced_at` column is the observation marker. Changed normaliz
 replace only source-owned relations and the latest sanitized payload; unchanged records
 only refresh observation state. Hidden contacts are omitted, hidden coordinates are removed
 from the stored payload, and only HTTPS media references are retained.
+
+## Gate 5B-R1 durable read-only probe
+
+The future observation-only command is:
+
+```powershell
+python -u -m app.jobs.probe_directorist_readonly
+```
+
+It is permanently fixed to HTTPS `ehsmall.com` and exactly four Directorist v1 GET attempts:
+directories, listing categories, listing locations, then listing page 1 with `per_page=2`.
+It accepts no host, URL, path, method, header, credential, cookie, or pagination arguments.
+Retries are disabled, redirects are rejected, individual records and additional pages are
+never followed, and the complete operation has a 45-second deadline.
+
+The probe imports no database, repository, or synchronization code and stores nothing. It
+emits flushed JSON lines for start, endpoint attempt, safe endpoint completion/failure, and
+an outermost final aggregate. Events contain only counts, approved aggregate pagination
+values, byte size, duration, controlled codes, and invariant results—never source records,
+contacts, identifiers, URLs, headers, or exception text. Exit codes are `0` for all four
+endpoints passing, `12` for a controlled upstream/validation failure, and `13` for a
+controlled internal or cleanup failure.
+
+Gate 5B-R1 tests use only `httpx.MockTransport`. Do not execute the command against the live
+host without separate Gate 5B-R2 approval.
