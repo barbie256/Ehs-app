@@ -49,6 +49,7 @@ class DirectoristClient:
         max_response_bytes: int = 2_000_000,
         retry_count: int = 2,
         retry_delay_seconds: float = 0,
+        enforce_reported_page_limit: bool = True,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         parsed = httpx.URL(base_url)
@@ -67,6 +68,7 @@ class DirectoristClient:
         self._max_response_bytes = max_response_bytes
         self._retry_count = retry_count
         self._retry_delay = retry_delay_seconds
+        self._enforce_reported_page_limit = enforce_reported_page_limit
         self._client = httpx.AsyncClient(
             transport=transport, follow_redirects=False, cookies=None, trust_env=False
         )
@@ -152,9 +154,9 @@ class DirectoristClient:
             self._raise_pagination("page_exceeds_total_pages", diagnostic)
         if total < len(payload):
             self._raise_pagination("total_below_collection_count", diagnostic)
-        if pages > self._max_pages:
+        if self._enforce_reported_page_limit and pages > self._max_pages:
             self._raise_pagination("total_pages_exceeds_configured_bound", diagnostic)
-        next_page = page + 1 if page < pages else None
+        next_page = page + 1 if page < pages and page < self._max_pages else None
         return DirectoristValidatedPage(
             items=items,
             failures=failures,

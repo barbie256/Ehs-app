@@ -113,6 +113,46 @@ def test_blank_coordinates_validate_normalize_and_preserve_output_allowlists() -
     assert transport.closed
 
 
+def test_consistent_multi_page_metadata_succeeds_without_additional_request() -> None:
+    listing_requests = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal listing_requests
+        if request.url.path.endswith("/listings"):
+            listing_requests += 1
+            return httpx.Response(
+                200,
+                json=[LISTING, LISTING],
+                headers={
+                    "content-type": "application/json",
+                    "X-WP-Total": "23",
+                    "X-WP-TotalPages": "12",
+                },
+                request=request,
+            )
+        return response_for(request)
+
+    code, events, transport, output = execute(handler)
+    listing = next(
+        event
+        for event in events
+        if event["event"] == "endpoint_completed" and event["endpoint"] == "listings"
+    )
+    assert code == 0
+    assert listing_requests == 1
+    assert listing["validation_count"] == 2
+    assert listing["normalization_count"] == 2
+    assert listing["currency_null"] is True
+    assert listing["summary_private_fields_excluded"] is True
+    assert listing["total"] == 23 and listing["total_pages"] == 12
+    assert events[-1]["attempted"] == 4
+    assert events[-1]["responses_received"] == 4
+    assert events[-1]["successful_endpoints"] == 4
+    assert events[-1]["normalized"] == 2
+    assert "endpoint_failed" not in output
+    assert transport.closed
+
+
 @pytest.mark.parametrize(
     ("headers", "reason"),
     [
@@ -123,10 +163,6 @@ def test_blank_coordinates_validate_normalize_and_preserve_output_allowlists() -
         ({"X-WP-Total": "-1", "X-WP-TotalPages": "1"}, "negative_metadata"),
         ({"X-WP-Total": "1", "X-WP-TotalPages": "0"}, "zero_pages_with_items"),
         ({"X-WP-Total": "1", "X-WP-TotalPages": "1"}, "total_below_collection_count"),
-        (
-            {"X-WP-Total": "2", "X-WP-TotalPages": "2"},
-            "total_pages_exceeds_configured_bound",
-        ),
     ],
 )
 def test_pagination_failures_emit_only_bounded_safe_diagnostics(

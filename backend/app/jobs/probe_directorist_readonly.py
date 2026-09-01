@@ -394,6 +394,7 @@ def _default_client_factory(transport: GuardedProbeTransport) -> ProbeClient:
         max_page_size=2,
         max_response_bytes=MAX_RESPONSE_BYTES,
         retry_count=0,
+        enforce_reported_page_limit=False,
         transport=transport,
     )
 

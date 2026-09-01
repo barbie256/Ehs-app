@@ -40,6 +40,8 @@ def test_no_database_sync_or_unsafe_http_imports() -> None:
     assert ".post(" not in lowered and ".put(" not in lowered and ".patch(" not in lowered
     assert "authorization=" not in lowered and "cookies=" not in lowered
     assert "retry_count=0" in source
+    assert "max_pages=1" in source
+    assert "enforce_reported_page_limit=False" in source
 
 
 def test_import_performs_no_work_or_output() -> None:

@@ -299,6 +299,84 @@ def test_excessive_pagination_integer_is_not_copied_to_diagnostic() -> None:
     assert excessive not in str(caught.value)
 
 
+def test_reported_page_limit_defaults_to_enabled() -> None:
+    parameter = inspect.signature(DirectoristClient).parameters["enforce_reported_page_limit"]
+    assert parameter.default is True
+
+
+def test_explicit_reported_page_limit_opt_out_accepts_metadata_but_not_page_two() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            request=request,
+            headers={
+                "content-type": "application/json",
+                "X-WP-Total": "23",
+                "X-WP-TotalPages": "12",
+            },
+            json=[RECORD, RECORD],
+        )
+
+    adapter = client(handler, max_pages=1, enforce_reported_page_limit=False)
+    page = run(adapter.get_validated_listings_page(1, 2))
+    assert len(page.items) == 2
+    assert page.total_items == 23 and page.total_pages == 12
+    assert page.next_page is None
+    with pytest.raises(DirectoristPaginationError):
+        run(adapter.get_validated_listings_page(2, 2))
+    run(adapter.aclose())
+    assert calls == 1
+
+
+@pytest.mark.parametrize(
+    ("headers", "page", "payload", "max_pages", "reason"),
+    [
+        ({"X-WP-TotalPages": "1"}, 1, [RECORD], 1, "missing_total"),
+        ({"X-WP-Total": "bad", "X-WP-TotalPages": "1"}, 1, [RECORD], 1, "invalid_total"),
+        ({"X-WP-Total": "1"}, 1, [RECORD], 1, "missing_total_pages"),
+        ({"X-WP-Total": "1", "X-WP-TotalPages": "bad"}, 1, [RECORD], 1, "invalid_total_pages"),
+        ({"X-WP-Total": "-1", "X-WP-TotalPages": "1"}, 1, [RECORD], 1, "negative_metadata"),
+        ({"X-WP-Total": "1", "X-WP-TotalPages": "0"}, 1, [RECORD], 1, "zero_pages_with_items"),
+        ({"X-WP-Total": "2", "X-WP-TotalPages": "1"}, 2, [RECORD], 2, "page_exceeds_total_pages"),
+        (
+            {"X-WP-Total": "1", "X-WP-TotalPages": "2"},
+            1,
+            [RECORD, RECORD],
+            1,
+            "total_below_collection_count",
+        ),
+    ],
+)
+def test_reported_page_limit_opt_out_preserves_other_pagination_validation(
+    headers: dict[str, str],
+    page: int,
+    payload: list[object],
+    max_pages: int,
+    reason: str,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            request=request,
+            headers={"content-type": "application/json", **headers},
+            json=payload,
+        )
+
+    adapter = client(
+        handler,
+        max_pages=max_pages,
+        enforce_reported_page_limit=False,
+    )
+    with pytest.raises(DirectoristPaginationError) as caught:
+        run(adapter.get_validated_listings_page(page, 2))
+    run(adapter.aclose())
+    assert caught.value.reason == reason
+
+
 def test_bounds_and_public_surface_are_get_only() -> None:
     adapter = client(lambda r: response(r, [RECORD]), max_pages=2, max_page_size=2)
     for coroutine in (

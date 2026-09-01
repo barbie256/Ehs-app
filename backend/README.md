@@ -98,6 +98,8 @@ failed. Another live execution requires separate approval.
 Pagination failures use a separate controlled diagnostic category. The failure event may
 report only header-presence and integer-validity booleans, bounded parsed totals, the fixed
 requested page, returned collection count, configured page bound, and one allowlisted reason
-code. Raw header strings and names are never emitted. This diagnostic does not relax the
-client's pagination rules: the probe still uses `max_pages=1`, performs four attempts, and
-does not request another page.
+code. Raw header strings and names are never emitted. The client keeps reported-page-limit
+enforcement enabled by default. The probe alone disables that metadata comparison while
+retaining `max_pages=1` as its request-page bound; it still performs four attempts and never
+requests another page. Missing, malformed, negative, contradictory, or undersized metadata
+continues to fail.

@@ -129,5 +129,7 @@ non-integer, negative, contradictory, and configured-bound failures using fixed 
 codes. Events may include only header-presence/validity booleans, bounded non-negative
 parsed totals, the fixed requested page, collection count, and configured maximum pages.
 They never include raw header strings, arbitrary header names, exception messages, or
-response data. The diagnostic leaves `max_pages=1` and all pagination rejection behavior
-unchanged; it does not authorize fetching another page.
+response data. Reported-page-limit enforcement remains enabled by default for the client and
+all existing callers. Only the fixed probe disables that metadata comparison; its
+`max_pages=1` request bound, page-one query, four-attempt ceiling, and every other pagination
+validation remain active. It does not authorize fetching another page.
