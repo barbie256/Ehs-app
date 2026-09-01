@@ -93,7 +93,7 @@ cd backend
 Do not run that command until Gate 5B-R2 explicitly authorizes live access. The command is
 fixed to four HTTPS GET attempts against the approved Directorist v1 paths on `ehsmall.com`.
 It has no CLI configuration, database access, persistence, retries, redirects, credentials,
-cookies, extra pagination, or record follow-up. The total deadline is 45 seconds.
+cookies, extra pagination, or record follow-up. The total deadline is 90 seconds.
 
 Safe flushed JSON-line events distinguish start, attempt, successful validated response,
 controlled failure stage, and final aggregate. Only aggregate counts, byte sizes, durations,

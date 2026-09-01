@@ -21,7 +21,8 @@ def test_frozen_host_paths_and_request_limits() -> None:
         "/wp-json/directorist/v1/listings/locations",
         "/wp-json/directorist/v1/listings",
     }
-    assert probe.TOTAL_TIMEOUT_SECONDS == 45.0
+    assert probe.REQUEST_TIMEOUT_SECONDS == 10.0
+    assert probe.TOTAL_TIMEOUT_SECONDS == 90.0
 
 
 def test_no_database_sync_or_unsafe_http_imports() -> None:

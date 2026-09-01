@@ -69,7 +69,7 @@ It is permanently fixed to HTTPS `ehsmall.com` and exactly four Directorist v1 G
 directories, listing categories, listing locations, then listing page 1 with `per_page=2`.
 It accepts no host, URL, path, method, header, credential, cookie, or pagination arguments.
 Retries are disabled, redirects are rejected, individual records and additional pages are
-never followed, and the complete operation has a 45-second deadline.
+never followed, and the complete operation has a 90-second deadline.
 
 The probe imports no database, repository, or synchronization code and stores nothing. It
 emits flushed JSON lines for start, endpoint attempt, safe endpoint completion/failure, and
