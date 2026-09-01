@@ -81,3 +81,16 @@ controlled internal or cleanup failure.
 
 Gate 5B-R1 tests use only `httpx.MockTransport`. Do not execute the command against the live
 host without separate Gate 5B-R2 approval.
+
+When a sampled listing fails Pydantic validation, the probe reports structural diagnostics
+only: its one-based sample position, a sanitized declared-schema field path, a stable error
+type, and an occurrence count. The failure event also includes safe response-byte,
+collection-item, failed-item, and total-validation-error counts. Diagnostics are capped at
+20 unique entries and set `diagnostics_truncated=true` when additional unique entries exist.
+
+Field paths allow only declared schema names, numeric collection positions, underscores,
+and dot separators; unexpected components become `redacted`. Error types use a bounded
+code pattern and otherwise become `validation_error`. Pydantic messages, rejected inputs,
+documentation URLs, exception strings, source IDs, and record values are never copied into
+events. Invalid listings are never normalized, and any invalid sample keeps the probe
+failed. Another live execution requires separate approval.

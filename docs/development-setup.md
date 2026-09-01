@@ -110,3 +110,16 @@ backend/.venv/Scripts/python.exe -m pytest `
 ```
 
 These tests use only `httpx.MockTransport` and synthetic fixtures.
+
+Listing validation failures produce privacy-safe structure only. Each diagnostic contains
+the sample position (1 or 2), a bounded declared-schema field path, a stable Pydantic-style
+error code, and an occurrence count. At most 20 unique diagnostics are emitted; a truncation
+flag indicates additional entries. Safe aggregate response-byte, collection-size,
+failed-record, and total-error counts accompany the diagnostic.
+
+The diagnostic collector copies only Pydantic `loc` and `type`. It never copies rejected
+inputs, messages, documentation URLs, exception text, listing IDs, contacts, descriptions,
+URLs, headers, or raw records. Unexpected path components are replaced by `redacted`, and
+invalid error codes become `validation_error`. Invalid records never reach normalization,
+and a sample containing any invalid record remains a controlled probe failure. A further
+live retry requires a new explicit authorization.

@@ -60,3 +60,24 @@ def test_event_key_sets_are_json_safe_and_private_free() -> None:
         {"title", "description", "address", "email", "phone", "url", "headers", "id"}
     )
     json.dumps({key: sorted(value) for key, value in probe.EVENT_KEYS.items()})
+
+
+def test_validation_diagnostics_copy_only_location_and_type() -> None:
+    source = MODULE.read_text(encoding="utf-8")
+    assert 'detail.get("loc")' in source
+    assert 'detail.get("type")' in source
+    for prohibited in (
+        'detail["input"]',
+        'detail.get("input")',
+        'detail["msg"]',
+        'detail.get("msg")',
+        'detail["url"]',
+        'detail.get("url")',
+        "str(validation_exception)",
+        "repr(validation_exception)",
+    ):
+        assert prohibited not in source
+    assert probe.MAX_DIAGNOSTIC_ENTRIES == 20
+    assert probe.MAX_DIAGNOSTIC_OUTPUT_BYTES <= 6_000
+    assert probe.MAX_FIELD_PATH_LENGTH <= 120
+    assert probe.MAX_ERROR_TYPE_LENGTH <= 64

@@ -1,6 +1,7 @@
 """Offline behavior tests for the durable read-only probe."""
 
 import asyncio
+import copy
 import io
 import json
 from pathlib import Path
@@ -212,6 +213,149 @@ def test_listing_validation_failure_is_controlled() -> None:
     assert code == 12
     assert any(event.get("stage") == "validation_failed" for event in events)
     assert "invalid" not in output
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected_path"),
+    [
+        (lambda item: item.pop("name"), "name"),
+        (lambda item: item.update({"status": 42}), "status"),
+        (
+            lambda item: item.update({"categories": [{"id": "private", "name": "Safe"}]}),
+            "categories.0.id",
+        ),
+        (
+            lambda item: item.update({"locations": [{"id": "private", "name": "Safe"}]}),
+            "locations.0.id",
+        ),
+        (lambda item: item.update({"images": [{"id": 1, "src": "private-value"}]}), "images.0.src"),
+    ],
+)
+def test_safe_structural_diagnostics_for_listing_errors(mutate: Any, expected_path: str) -> None:
+    invalid = copy.deepcopy(LISTING)
+    mutate(invalid)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return (
+            response_for(request, [invalid])
+            if request.url.path.endswith("/listings")
+            else response_for(request)
+        )
+
+    code, events, _, output = execute(handler)
+    failure = next(event for event in events if event["event"] == "endpoint_failed")
+    assert code == 12
+    assert failure["stage"] == "validation_failed"
+    assert failure["response_byte_count"] > 0
+    assert failure["collection_item_count"] == 1
+    assert failure["failed_validation_count"] == 1
+    assert failure["total_validation_errors"] >= 1
+    assert any(item["field_path"] == expected_path for item in failure["validation_diagnostics"])
+    assert all(item["sample_position"] == 1 for item in failure["validation_diagnostics"])
+    assert "private-value" not in output and '"private"' not in output
+
+
+def test_multiple_errors_across_both_records_are_positioned_and_mapper_is_not_called() -> None:
+    first = copy.deepcopy(LISTING)
+    second = copy.deepcopy(LISTING)
+    first.pop("name")
+    first["categories"] = [{"id": "do-not-print", "name": "Safe"}]
+    second["locations"] = [{"id": "do-not-print", "name": "Safe"}]
+    mapper_calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return (
+            response_for(request, [first, second])
+            if request.url.path.endswith("/listings")
+            else response_for(request)
+        )
+
+    def tracking_mapper(*_: Any) -> Any:
+        nonlocal mapper_calls
+        mapper_calls += 1
+        raise AssertionError("invalid records must not reach mapper")
+
+    code, events, _, output = execute(handler, mapper=tracking_mapper)
+    failure = next(event for event in events if event["event"] == "endpoint_failed")
+    assert code == 12 and mapper_calls == 0
+    assert failure["collection_item_count"] == 2
+    assert failure["failed_validation_count"] == 2
+    assert failure["total_validation_errors"] == 3
+    assert {item["sample_position"] for item in failure["validation_diagnostics"]} == {1, 2}
+    assert events[0]["event"] == "probe_started"
+    assert events[-1]["event"] == "probe_finished"
+    assert events[-1]["attempted"] == 4
+    assert events[-1]["responses_received"] == 4
+    assert events[-1]["successful_endpoints"] == 3
+    assert "do-not-print" not in output
+
+
+def test_diagnostics_truncate_after_twenty_unique_entries() -> None:
+    invalid = copy.deepcopy(LISTING)
+    invalid["categories"] = [{"id": f"private-{index}", "name": "Safe"} for index in range(25)]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return (
+            response_for(request, [invalid])
+            if request.url.path.endswith("/listings")
+            else response_for(request)
+        )
+
+    code, events, _, output = execute(handler)
+    failure = next(event for event in events if event["event"] == "endpoint_failed")
+    assert code == 12
+    assert failure["total_validation_errors"] == 25
+    assert len(failure["validation_diagnostics"]) == probe.MAX_DIAGNOSTIC_ENTRIES
+    assert failure["diagnostics_truncated"] is True
+    assert "private-" not in output
+
+
+def test_safe_diagnostic_grouping_and_unsafe_path_redaction() -> None:
+    entries, truncated = probe._group_diagnostics(
+        [(1, "price", "string_type"), (1, "price", "string_type")]
+    )
+    assert entries == (probe.SafeValidationDiagnostic(1, "price", "string_type", 2),)
+    assert truncated is False
+    assert probe._safe_field_path(("categories", 0, "unsafe-key!")) == "categories.0.redacted"
+    assert probe._safe_field_path(("private-key!",)) == "redacted"
+    assert probe._safe_error_type("free form message!") == "validation_error"
+
+
+def test_diagnostics_never_emit_messages_inputs_or_private_fields() -> None:
+    invalid = copy.deepcopy(LISTING)
+    invalid.update(
+        {
+            "name": 5,
+            "description": "PRIVATE DESCRIPTION",
+            "address": "PRIVATE ADDRESS",
+            "email": "private@example.invalid",
+            "phone": "+000000000",
+            "permalink": "not-a-private-url",
+            "author": "PRIVATE AUTHOR",
+        }
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return (
+            response_for(request, [invalid])
+            if request.url.path.endswith("/listings")
+            else response_for(request)
+        )
+
+    _, events, _, output = execute(handler)
+    failure = next(event for event in events if event["event"] == "endpoint_failed")
+    assert failure["total_validation_errors"] >= 3
+    for private in (
+        "PRIVATE DESCRIPTION",
+        "PRIVATE ADDRESS",
+        "private@example.invalid",
+        "+000000000",
+        "not-a-private-url",
+        "PRIVATE AUTHOR",
+        "Input should be",
+        "errors.pydantic.dev",
+    ):
+        assert private not in output
 
 
 def test_listing_normalization_failure_is_controlled() -> None:
