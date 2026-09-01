@@ -94,3 +94,10 @@ code pattern and otherwise become `validation_error`. Pydantic messages, rejecte
 documentation URLs, exception strings, source IDs, and record values are never copied into
 events. Invalid listings are never normalized, and any invalid sample keeps the probe
 failed. Another live execution requires separate approval.
+
+Pagination failures use a separate controlled diagnostic category. The failure event may
+report only header-presence and integer-validity booleans, bounded parsed totals, the fixed
+requested page, returned collection count, configured page bound, and one allowlisted reason
+code. Raw header strings and names are never emitted. This diagnostic does not relax the
+client's pagination rules: the probe still uses `max_pages=1`, performs four attempts, and
+does not request another page.

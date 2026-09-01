@@ -123,3 +123,11 @@ URLs, headers, or raw records. Unexpected path components are replaced by `redac
 invalid error codes become `validation_error`. Invalid records never reach normalization,
 and a sample containing any invalid record remains a controlled probe failure. A further
 live retry requires a new explicit authorization.
+
+Pagination diagnostics are also privacy-safe and bounded. They distinguish missing,
+non-integer, negative, contradictory, and configured-bound failures using fixed reason
+codes. Events may include only header-presence/validity booleans, bounded non-negative
+parsed totals, the fixed requested page, collection count, and configured maximum pages.
+They never include raw header strings, arbitrary header names, exception messages, or
+response data. The diagnostic leaves `max_pages=1` and all pagination rejection behavior
+unchanged; it does not authorize fetching another page.

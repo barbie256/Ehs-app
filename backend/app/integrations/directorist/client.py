@@ -21,6 +21,8 @@ from app.integrations.directorist.errors import (
     DirectoristSchemaError,
     DirectoristTimeoutError,
     DirectoristUnavailableError,
+    PaginationDiagnostic,
+    PaginationReason,
 )
 from app.integrations.directorist.schemas import (
     DirectoristListingV1,
@@ -31,6 +33,7 @@ from app.integrations.directorist.schemas import (
 
 TRANSIENT_STATUSES = {500, 502, 503, 504}
 JSON_CONTENT_TYPES = {"application/json", "application/problem+json"}
+MAX_SAFE_DIAGNOSTIC_INTEGER = 2_147_483_647
 
 
 class DirectoristClient:
@@ -120,12 +123,37 @@ class DirectoristClient:
                     str(candidate) if isinstance(candidate, int) and candidate > 0 else "unknown"
                 )
                 failures.append(ListingValidationFailure(external_id=safe_id))
-        total = self._header_int(response.headers, "X-WP-Total")
-        pages = self._header_int(response.headers, "X-WP-TotalPages")
-        if total < 0 or pages < 0 or (pages == 0 and total > 0) or page > max(pages, 1):
-            raise DirectoristPaginationError("pagination metadata is contradictory")
-        if total < len(payload) or pages > self._max_pages:
-            raise DirectoristPaginationError("pagination metadata exceeds safe bounds")
+        total_present, total_valid, total = self._header_state(response.headers, "X-WP-Total")
+        pages_present, pages_valid, pages = self._header_state(response.headers, "X-WP-TotalPages")
+        diagnostic = self._pagination_diagnostic(
+            total_present=total_present,
+            total_valid=total_valid,
+            total=total,
+            pages_present=pages_present,
+            pages_valid=pages_valid,
+            pages=pages,
+            requested_page=page,
+            returned_collection_count=len(payload),
+        )
+        if not total_present:
+            self._raise_pagination("missing_total", diagnostic)
+        if not total_valid:
+            self._raise_pagination("invalid_total", diagnostic)
+        if not pages_present:
+            self._raise_pagination("missing_total_pages", diagnostic)
+        if not pages_valid:
+            self._raise_pagination("invalid_total_pages", diagnostic)
+        assert total is not None and pages is not None
+        if total < 0 or pages < 0:
+            self._raise_pagination("negative_metadata", diagnostic)
+        if pages == 0 and total > 0:
+            self._raise_pagination("zero_pages_with_items", diagnostic)
+        if page > max(pages, 1):
+            self._raise_pagination("page_exceeds_total_pages", diagnostic)
+        if total < len(payload):
+            self._raise_pagination("total_below_collection_count", diagnostic)
+        if pages > self._max_pages:
+            self._raise_pagination("total_pages_exceeds_configured_bound", diagnostic)
         next_page = page + 1 if page < pages else None
         return DirectoristValidatedPage(
             items=items,
@@ -206,11 +234,54 @@ class DirectoristClient:
         raise DirectoristUnavailableError()
 
     @staticmethod
-    def _header_int(headers: httpx.Headers, name: str) -> int:
+    def _header_state(headers: httpx.Headers, name: str) -> tuple[bool, bool, int | None]:
+        value = headers.get(name)
+        if value is None:
+            return False, False, None
         try:
-            return int(headers[name])
-        except KeyError, ValueError:
-            raise DirectoristPaginationError(f"{name} is missing or invalid") from None
+            return True, True, int(value)
+        except ValueError:
+            return True, False, None
+
+    def _pagination_diagnostic(
+        self,
+        *,
+        total_present: bool,
+        total_valid: bool,
+        total: int | None,
+        pages_present: bool,
+        pages_valid: bool,
+        pages: int | None,
+        requested_page: int,
+        returned_collection_count: int,
+    ) -> PaginationDiagnostic:
+        return PaginationDiagnostic(
+            total_header_present=total_present,
+            total_header_integer_valid=total_valid,
+            total_pages_header_present=pages_present,
+            total_pages_header_integer_valid=pages_valid,
+            reported_total=self._safe_diagnostic_integer(total),
+            reported_total_pages=self._safe_diagnostic_integer(pages),
+            requested_page=min(max(requested_page, 0), MAX_SAFE_DIAGNOSTIC_INTEGER),
+            returned_collection_count=min(
+                max(returned_collection_count, 0), MAX_SAFE_DIAGNOSTIC_INTEGER
+            ),
+            configured_max_pages=min(max(self._max_pages, 1), MAX_SAFE_DIAGNOSTIC_INTEGER),
+        )
+
+    @staticmethod
+    def _safe_diagnostic_integer(value: int | None) -> int | None:
+        if value is None or value < 0 or value > MAX_SAFE_DIAGNOSTIC_INTEGER:
+            return None
+        return value
+
+    @staticmethod
+    def _raise_pagination(reason: PaginationReason, diagnostic: PaginationDiagnostic) -> None:
+        raise DirectoristPaginationError(
+            "Directorist pagination validation failed",
+            reason=reason,
+            diagnostic=diagnostic,
+        )
 
     def _parse_listings(self, payload: list[object]) -> list[DirectoristListingV1]:
         if not all(isinstance(item, dict) for item in payload):

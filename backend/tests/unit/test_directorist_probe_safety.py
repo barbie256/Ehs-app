@@ -60,6 +60,19 @@ def test_event_key_sets_are_json_safe_and_private_free() -> None:
         {"title", "description", "address", "email", "phone", "url", "headers", "id"}
     )
     json.dumps({key: sorted(value) for key, value in probe.EVENT_KEYS.items()})
+    assert {
+        "failure_category",
+        "pagination_reason",
+        "total_header_present",
+        "total_header_integer_valid",
+        "total_pages_header_present",
+        "total_pages_header_integer_valid",
+        "reported_total",
+        "reported_total_pages",
+        "requested_page",
+        "returned_collection_count",
+        "configured_max_pages",
+    } <= probe.EVENT_KEYS["endpoint_failed"]
 
 
 def test_validation_diagnostics_copy_only_location_and_type() -> None:

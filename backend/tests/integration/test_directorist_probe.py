@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from app.integrations.directorist.client import DirectoristClient
+from app.integrations.directorist.errors import DirectoristPaginationError
 from app.jobs import probe_directorist_readonly as probe
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "directorist_listing_v1.json"
@@ -110,6 +111,70 @@ def test_blank_coordinates_validate_normalize_and_preserve_output_allowlists() -
     assert set(listing) <= probe.EVENT_KEYS["endpoint_completed"]
     assert "validation_diagnostics" not in output
     assert transport.closed
+
+
+@pytest.mark.parametrize(
+    ("headers", "reason"),
+    [
+        ({"X-WP-TotalPages": "1"}, "missing_total"),
+        ({"X-WP-Total": "", "X-WP-TotalPages": "1"}, "invalid_total"),
+        ({"X-WP-Total": "1"}, "missing_total_pages"),
+        ({"X-WP-Total": "1", "X-WP-TotalPages": "private-invalid"}, "invalid_total_pages"),
+        ({"X-WP-Total": "-1", "X-WP-TotalPages": "1"}, "negative_metadata"),
+        ({"X-WP-Total": "1", "X-WP-TotalPages": "0"}, "zero_pages_with_items"),
+        ({"X-WP-Total": "1", "X-WP-TotalPages": "1"}, "total_below_collection_count"),
+        (
+            {"X-WP-Total": "2", "X-WP-TotalPages": "2"},
+            "total_pages_exceeds_configured_bound",
+        ),
+    ],
+)
+def test_pagination_failures_emit_only_bounded_safe_diagnostics(
+    headers: dict[str, str], reason: str
+) -> None:
+    mapper_calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/listings"):
+            return httpx.Response(
+                200,
+                json=[LISTING, LISTING],
+                headers={"content-type": "application/json", **headers},
+                request=request,
+            )
+        return response_for(request)
+
+    def tracking_mapper(*_: Any) -> Any:
+        nonlocal mapper_calls
+        mapper_calls += 1
+        raise AssertionError("pagination failures must not reach normalization")
+
+    code, events, transport, output = execute(handler, mapper=tracking_mapper)
+    failure = next(event for event in events if event["event"] == "endpoint_failed")
+    assert code == 12 and mapper_calls == 0
+    assert failure["failure_category"] == "pagination"
+    assert failure["pagination_reason"] == reason
+    assert failure["requested_page"] == 1
+    assert failure["returned_collection_count"] == 2
+    assert failure["configured_max_pages"] == 1
+    assert failure["failed_validation_count"] == 0
+    assert failure["total_validation_errors"] == 0
+    assert events[-1]["attempted"] == 4
+    assert events[-1]["responses_received"] == 4
+    assert events[-1]["successful_endpoints"] == 3
+    assert events[-1]["normalized"] == 0
+    assert set(failure) <= probe.EVENT_KEYS["endpoint_failed"]
+    assert "private-invalid" not in output
+    assert transport.closed
+
+
+def test_controlled_fallback_pagination_reason_is_bounded() -> None:
+    assert probe._pagination_event_values(DirectoristPaginationError()) == {
+        "failure_category": "pagination",
+        "pagination_reason": "pagination_validation",
+    }
+    error = DirectoristPaginationError(reason="private-arbitrary-reason")  # type: ignore[arg-type]
+    assert probe._pagination_event_values(error)["pagination_reason"] == "pagination_validation"
 
 
 def test_failure_before_client_construction_still_finishes() -> None:

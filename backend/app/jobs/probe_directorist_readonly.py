@@ -81,6 +81,17 @@ EVENT_KEYS: Mapping[str, frozenset[str]] = {
             "total_validation_errors",
             "validation_diagnostics",
             "diagnostics_truncated",
+            "failure_category",
+            "pagination_reason",
+            "total_header_present",
+            "total_header_integer_valid",
+            "total_pages_header_present",
+            "total_pages_header_integer_valid",
+            "reported_total",
+            "reported_total_pages",
+            "requested_page",
+            "returned_collection_count",
+            "configured_max_pages",
         }
     ),
     "probe_finished": frozenset(
@@ -435,7 +446,7 @@ async def run_probe(
                         transport.rejected += 1
                     diagnostic_values: dict[str, object] = {}
                     if stage == "validation_failed" and endpoint == "listings":
-                        diagnostic_values = _diagnostic_event_values(transport)
+                        diagnostic_values = _diagnostic_event_values(transport, error)
                     output.emit(
                         "endpoint_failed",
                         endpoint=endpoint,
@@ -510,7 +521,9 @@ async def run_probe(
     return state.exit_code
 
 
-def _diagnostic_event_values(transport: GuardedProbeTransport) -> dict[str, object]:
+def _diagnostic_event_values(
+    transport: GuardedProbeTransport, error: Exception
+) -> dict[str, object]:
     metric = transport.last_metric
     summary = transport.last_validation_summary
     if metric is None or summary is None:
@@ -530,7 +543,7 @@ def _diagnostic_event_values(transport: GuardedProbeTransport) -> dict[str, obje
     ):
         diagnostics.pop()
         size_truncated = True
-    return {
+    values: dict[str, object] = {
         "response_byte_count": metric.response_bytes,
         "collection_item_count": summary.collection_item_count,
         "failed_validation_count": summary.failed_validation_count,
@@ -538,6 +551,33 @@ def _diagnostic_event_values(transport: GuardedProbeTransport) -> dict[str, obje
         "validation_diagnostics": diagnostics,
         "diagnostics_truncated": summary.truncated or size_truncated,
     }
+    if isinstance(error, DirectoristPaginationError):
+        values.update(_pagination_event_values(error))
+    return values
+
+
+def _pagination_event_values(error: DirectoristPaginationError) -> dict[str, object]:
+    values: dict[str, object] = {
+        "failure_category": "pagination",
+        "pagination_reason": error.reason,
+    }
+    diagnostic = error.diagnostic
+    if diagnostic is None:
+        return values
+    values.update(
+        {
+            "total_header_present": diagnostic.total_header_present,
+            "total_header_integer_valid": diagnostic.total_header_integer_valid,
+            "total_pages_header_present": diagnostic.total_pages_header_present,
+            "total_pages_header_integer_valid": diagnostic.total_pages_header_integer_valid,
+            "reported_total": diagnostic.reported_total,
+            "reported_total_pages": diagnostic.reported_total_pages,
+            "requested_page": diagnostic.requested_page,
+            "returned_collection_count": diagnostic.returned_collection_count,
+            "configured_max_pages": diagnostic.configured_max_pages,
+        }
+    )
+    return values
 
 
 def _validate_result(

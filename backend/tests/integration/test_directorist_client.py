@@ -206,6 +206,99 @@ def test_invalid_pagination(headers: dict[str, str], page: int) -> None:
     run(adapter.aclose())
 
 
+@pytest.mark.parametrize(
+    ("headers", "page", "payload", "max_pages", "reason"),
+    [
+        ({"X-WP-TotalPages": "1"}, 1, [RECORD], 10, "missing_total"),
+        ({"X-WP-Total": "", "X-WP-TotalPages": "1"}, 1, [RECORD], 10, "invalid_total"),
+        (
+            {"X-WP-Total": "not-an-integer", "X-WP-TotalPages": "1"},
+            1,
+            [RECORD],
+            10,
+            "invalid_total",
+        ),
+        ({"X-WP-Total": "1"}, 1, [RECORD], 10, "missing_total_pages"),
+        ({"X-WP-Total": "1", "X-WP-TotalPages": ""}, 1, [RECORD], 10, "invalid_total_pages"),
+        (
+            {"X-WP-Total": "1", "X-WP-TotalPages": "not-an-integer"},
+            1,
+            [RECORD],
+            10,
+            "invalid_total_pages",
+        ),
+        ({"X-WP-Total": "-1", "X-WP-TotalPages": "1"}, 1, [RECORD], 10, "negative_metadata"),
+        ({"X-WP-Total": "1", "X-WP-TotalPages": "0"}, 1, [RECORD], 10, "zero_pages_with_items"),
+        ({"X-WP-Total": "2", "X-WP-TotalPages": "1"}, 2, [RECORD], 10, "page_exceeds_total_pages"),
+        (
+            {"X-WP-Total": "1", "X-WP-TotalPages": "1"},
+            1,
+            [RECORD, RECORD],
+            10,
+            "total_below_collection_count",
+        ),
+        (
+            {"X-WP-Total": "2", "X-WP-TotalPages": "2"},
+            1,
+            [RECORD],
+            1,
+            "total_pages_exceeds_configured_bound",
+        ),
+    ],
+)
+def test_structured_pagination_reasons_preserve_rejection_behavior(
+    headers: dict[str, str],
+    page: int,
+    payload: list[object],
+    max_pages: int,
+    reason: str,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            request=request,
+            headers={"content-type": "application/json", **headers},
+            json=payload,
+        )
+
+    adapter = client(handler, max_pages=max_pages)
+    with pytest.raises(DirectoristPaginationError) as caught:
+        run(adapter.get_validated_listings_page(page, 2))
+    run(adapter.aclose())
+    assert caught.value.reason == reason
+    diagnostic = caught.value.diagnostic
+    assert diagnostic is not None
+    assert diagnostic.requested_page == page
+    assert diagnostic.returned_collection_count == len(payload)
+    assert diagnostic.configured_max_pages == max_pages
+
+
+def test_excessive_pagination_integer_is_not_copied_to_diagnostic() -> None:
+    excessive = str(2**100)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            request=request,
+            headers={
+                "content-type": "application/json",
+                "X-WP-Total": "1",
+                "X-WP-TotalPages": excessive,
+            },
+            json=[RECORD],
+        )
+
+    adapter = client(handler, max_pages=1)
+    with pytest.raises(DirectoristPaginationError) as caught:
+        run(adapter.get_validated_listings_page(1, 2))
+    run(adapter.aclose())
+    assert caught.value.reason == "total_pages_exceeds_configured_bound"
+    assert caught.value.diagnostic is not None
+    assert caught.value.diagnostic.total_pages_header_integer_valid is True
+    assert caught.value.diagnostic.reported_total_pages is None
+    assert excessive not in str(caught.value)
+
+
 def test_bounds_and_public_surface_are_get_only() -> None:
     adapter = client(lambda r: response(r, [RECORD]), max_pages=2, max_page_size=2)
     for coroutine in (
