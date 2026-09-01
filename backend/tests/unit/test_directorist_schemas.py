@@ -4,6 +4,7 @@ import json
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -15,7 +16,8 @@ EXPECTED_SHA256 = "25b51d5f131c6986d6c08b2ed714f0ed8652ee54a617c7bea4f685334173d
 
 
 def fixture_record() -> dict[str, object]:
-    return json.loads(FIXTURE.read_text(encoding="utf-8"))["records"][0]
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    return cast(dict[str, object], payload["records"][0])
 
 
 def test_fixture_sha256_is_frozen() -> None:

@@ -28,12 +28,12 @@ def setting_overrides(**overrides: object) -> dict[str, object]:
 def validation_error(**overrides: object) -> SettingsConfigurationError:
     """Create and return an expected settings validation error."""
     with pytest.raises(SettingsConfigurationError) as caught:
-        Settings(**setting_overrides(**overrides))  # type: ignore[arg-type]
+        Settings(**setting_overrides(**overrides))
     return caught.value
 
 
 def test_development_settings_load_from_safe_placeholders() -> None:
-    settings = Settings(**setting_overrides())  # type: ignore[arg-type]
+    settings = Settings(**setting_overrides())
 
     assert settings.app_env is AppEnvironment.DEVELOPMENT
     assert settings.database_url.get_secret_value().endswith("/ehs_test")
@@ -41,7 +41,7 @@ def test_development_settings_load_from_safe_placeholders() -> None:
 
 
 def test_test_settings_load() -> None:
-    settings = Settings(  # type: ignore[arg-type]
+    settings = Settings(
         **setting_overrides(
             APP_ENV="test",
             DIRECTORIST_BASE_URL="http://directorist.test",

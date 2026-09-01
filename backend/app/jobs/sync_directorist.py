@@ -3,12 +3,13 @@
 import asyncio
 import logging
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.config import SettingsConfigurationError, get_settings
-from app.db.readiness import migration_head_status
+from app.core.config import AppEnvironment, Settings, SettingsConfigurationError, get_settings
+from app.db.readiness import synchronization_readiness
 from app.db.session import DatabaseSafetyError, create_database_engine, validate_development_url
 from app.integrations.directorist.client import DirectoristClient
 from app.services.catalogue_sync import CatalogueSyncService
@@ -16,9 +17,33 @@ from app.services.catalogue_sync import CatalogueSyncService
 logger = logging.getLogger(__name__)
 
 
+def _validate_job_boundary(settings: Settings) -> None:
+    """Require the single approved environment and source before any I/O."""
+    if settings.app_env is not AppEnvironment.DEVELOPMENT:
+        raise SettingsConfigurationError("catalogue synchronization requires development")
+    try:
+        source = urlsplit(settings.directorist_base_url)
+        port = source.port
+    except ValueError:
+        raise SettingsConfigurationError("catalogue synchronization source is invalid") from None
+    if (
+        source.scheme != "https"
+        or source.hostname != "ehsmall.com"
+        or port not in {None, 443}
+        or source.username is not None
+        or source.password is not None
+        or source.path not in {"", "/"}
+        or source.query
+        or source.fragment
+        or settings.directorist_api_version != "v1"
+    ):
+        raise SettingsConfigurationError("catalogue synchronization source is not approved")
+
+
 async def _run() -> int:
     try:
         settings = get_settings()
+        _validate_job_boundary(settings)
         database_url = settings.database_url.get_secret_value()
         validate_development_url(database_url)
     except SettingsConfigurationError, DatabaseSafetyError:
@@ -27,9 +52,11 @@ async def _run() -> int:
 
     engine = create_database_engine(database_url)
     try:
-        readiness = migration_head_status(engine, backend_dir=Path(__file__).resolve().parents[2])
+        readiness = synchronization_readiness(
+            engine, backend_dir=Path(__file__).resolve().parents[2]
+        )
         if readiness.status != "current":
-            logger.error("catalogue sync requires the database at the current migration head")
+            logger.error("catalogue sync database readiness rejected")
             return 11
         with (
             engine.connect() as connection,

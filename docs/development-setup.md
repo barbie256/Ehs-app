@@ -71,10 +71,13 @@ cd backend
 .venv/Scripts/python.exe -m app.jobs.sync_directorist
 ```
 
-That command uses `ehs_mall_dev` and performs read-only network GETs against the configured
-Directorist host. Do not invoke it without explicit approval for both that database and
-source host. It never selects `TEST_DATABASE_URL`, never falls back between databases, and
-does not create or migrate schema. Run Alembic separately before an approved synchronization.
+That command fails closed unless `APP_ENV=development`, the source is exactly HTTPS
+`ehsmall.com` on port 443, and the database is the dedicated local `ehs_mall_dev` database.
+Before HTTP, advisory-lock acquisition, or a sync-run write, it checks the Alembic head and
+a frozen inventory of required synchronization tables. It never selects `TEST_DATABASE_URL`,
+never falls back between databases, and never creates, repairs, or migrates schema. Do not
+invoke it without explicit approval for both that database and source host. Run Alembic
+separately before an approved synchronization.
 
 Exit codes are: `0` success, `2` overlap skipped, `3` partial item failures, `10` unsafe or
 invalid configuration, `11` database failure, `12` Directorist failure, and `13` another

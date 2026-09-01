@@ -36,9 +36,12 @@ HTML is sanitized with a small allowlist before normalization.
 
 ## Gate 5A offline-testable catalogue synchronization
 
-`python -m app.jobs.sync_directorist` is the explicit one-shot entry point. It validates
-that `DATABASE_URL` is the dedicated local `ehs_mall_dev` database before connecting, then
-uses one database connection for the complete job and its PostgreSQL session advisory lock.
+`python -m app.jobs.sync_directorist` is the explicit one-shot entry point. It fails closed
+unless `APP_ENV` is exactly `development`, the source is exactly HTTPS `ehsmall.com` on its
+standard port, and `DATABASE_URL` is the dedicated local `ehs_mall_dev` database. Before
+HTTP, advisory-lock acquisition, or a sync-run write, it verifies both Alembic head and a
+frozen inventory of synchronization tables. It never creates or repairs tables, then uses
+one database connection for the complete job and its PostgreSQL session advisory lock.
 The command performs real read-only Directorist GET requests when invoked, so it must not be
 run without separate approval for the configured source. Gate 5A verification uses fakes,
 HTTPX mock transports, and only the guarded `ehs_mall_test` database; it makes no live HTTP
@@ -56,6 +59,10 @@ The existing `last_synced_at` column is the observation marker. Changed normaliz
 replace only source-owned relations and the latest sanitized payload; unchanged records
 only refresh observation state. Hidden contacts are omitted, hidden coordinates are removed
 from the stored payload, and only HTTPS media references are retained.
+
+Follow-up reconciliation work must cover coordinate-only checksum changes and lock-release
+failure after an already-finalized run. Public contact display remains blocked on explicit
+consent and policy review.
 
 ## Gate 5B-R1 durable read-only probe
 
