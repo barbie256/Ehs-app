@@ -62,6 +62,22 @@ def test_hidden_contacts_are_removed_and_visible_contacts_are_normalized() -> No
         FakeResolver({29: mapping()}),
     )
     assert {item.contact_type for item in visible.contacts} == {"email", "phone"}
+    assert visible.owner_contact_hidden is False
+
+
+def test_invalid_visible_contacts_and_non_https_media_are_omitted() -> None:
+    normalized = map_listing(
+        source(
+            owner_contact_hidden=False,
+            email="not-an-email",
+            phone="letters",
+            images=[{"id": 42, "src": "http://example.invalid/image.jpg"}],
+        ),
+        FakeResolver({29: mapping()}),
+    )
+    assert normalized.owner_contact_hidden is False
+    assert normalized.contacts == []
+    assert normalized.media == []
 
 
 def test_checksum_is_deterministic_and_yoast_and_links_are_omitted() -> None:

@@ -225,6 +225,7 @@ def test_bounds_and_public_surface_are_get_only() -> None:
     assert public == {
         "aclose",
         "get_listings_page",
+        "get_validated_listings_page",
         "get_listing",
         "get_directories",
         "get_categories",

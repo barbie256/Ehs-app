@@ -22,7 +22,12 @@ from app.integrations.directorist.errors import (
     DirectoristTimeoutError,
     DirectoristUnavailableError,
 )
-from app.integrations.directorist.schemas import DirectoristListingV1, DirectoristPage
+from app.integrations.directorist.schemas import (
+    DirectoristListingV1,
+    DirectoristPage,
+    DirectoristValidatedPage,
+    ListingValidationFailure,
+)
 
 TRANSIENT_STATUSES = {500, 502, 503, 504}
 JSON_CONTENT_TYPES = {"application/json", "application/problem+json"}
@@ -75,6 +80,22 @@ class DirectoristClient:
     async def get_listings_page(
         self, page: int, per_page: int, modified_after: datetime | None = None
     ) -> DirectoristPage:
+        validated = await self.get_validated_listings_page(page, per_page, modified_after)
+        if validated.failures:
+            raise DirectoristSchemaError("Directorist listing failed schema validation")
+        return DirectoristPage(
+            items=validated.items,
+            current_page=validated.current_page,
+            page_size=validated.page_size,
+            total_items=validated.total_items,
+            total_pages=validated.total_pages,
+            next_page=validated.next_page,
+        )
+
+    async def get_validated_listings_page(
+        self, page: int, per_page: int, modified_after: datetime | None = None
+    ) -> DirectoristValidatedPage:
+        """Read a page while returning only redacted identities for malformed members."""
         if page < 1 or page > self._max_pages:
             raise DirectoristPaginationError("page is outside configured bounds")
         if per_page < 1 or per_page > self._max_page_size:
@@ -85,16 +106,30 @@ class DirectoristClient:
         response, payload = await self._get("/listings", params)
         if not isinstance(payload, list):
             raise DirectoristResponseFormatError("listing collection must be an array")
-        items = self._parse_listings(payload)
+        items: list[DirectoristListingV1] = []
+        failures: list[ListingValidationFailure] = []
+        for raw in payload:
+            if not isinstance(raw, dict):
+                failures.append(ListingValidationFailure(external_id="unknown"))
+                continue
+            try:
+                items.append(self._parse_listing(raw))
+            except DirectoristSchemaError:
+                candidate = raw.get("id")
+                safe_id = (
+                    str(candidate) if isinstance(candidate, int) and candidate > 0 else "unknown"
+                )
+                failures.append(ListingValidationFailure(external_id=safe_id))
         total = self._header_int(response.headers, "X-WP-Total")
         pages = self._header_int(response.headers, "X-WP-TotalPages")
         if total < 0 or pages < 0 or (pages == 0 and total > 0) or page > max(pages, 1):
             raise DirectoristPaginationError("pagination metadata is contradictory")
-        if total < len(items) or pages > self._max_pages:
+        if total < len(payload) or pages > self._max_pages:
             raise DirectoristPaginationError("pagination metadata exceeds safe bounds")
         next_page = page + 1 if page < pages else None
-        return DirectoristPage(
+        return DirectoristValidatedPage(
             items=items,
+            failures=failures,
             current_page=page,
             page_size=per_page,
             total_items=total,

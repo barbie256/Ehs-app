@@ -98,3 +98,23 @@ class DirectoristPage(BaseModel):
     total_items: int
     total_pages: int
     next_page: int | None
+
+
+class ListingValidationFailure(BaseModel):
+    """Safe identity for one invalid collection member; never contains source values."""
+
+    external_id: str
+    error_code: str = "invalid_listing_schema"
+    field_summary: str = "listing"
+
+
+class DirectoristValidatedPage(BaseModel):
+    """A page whose malformed members are isolated for synchronization."""
+
+    items: list[DirectoristListingV1]
+    failures: list[ListingValidationFailure]
+    current_page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+    next_page: int | None

@@ -1,6 +1,7 @@
 """Pure Directorist normalization; no database or network dependencies."""
 
 import json
+import re
 from hashlib import sha256
 from typing import Protocol
 
@@ -24,6 +25,8 @@ ALLOWED_TAGS = {"p", "br", "strong", "em", "ul", "ol", "li", "a"}
 ALLOWED_ATTRIBUTES = {"a": {"href", "title"}}
 ALLOWED_SCHEMES = {"http", "https"}
 SUMMARY_LIMIT = 500
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9 ()-]{5,24}$")
 
 
 class TaxonomyResolver(Protocol):
@@ -61,7 +64,7 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
     if not source.owner_contact_hidden:
         for contact_type in ("email", "phone", "phone_2", "fax", "website"):
             raw = getattr(source, contact_type)
-            if raw:
+            if raw and _valid_contact(contact_type, str(raw).strip()):
                 contacts.append(
                     NormalizedContact(contact_type=contact_type, value=str(raw).strip())
                 )
@@ -74,6 +77,7 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
             position=item.position,
         )
         for item in sorted(source.images, key=lambda image: (image.position, image.id))
+        if item.src.scheme == "https"
     ]
     categories = [
         TaxonomyRef(external_id=item.id, name=item.name, slug=item.slug)
@@ -99,6 +103,7 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
         "pricing_type": source.pricing_type,
         "media": [item.model_dump(mode="json") for item in media],
         "contacts": [item.model_dump(mode="json") for item in contacts],
+        "owner_contact_hidden": source.owner_contact_hidden,
     }
     checksum = sha256(
         json.dumps(checksum_input, sort_keys=True, separators=(",", ":")).encode()
@@ -123,6 +128,7 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
         latitude=source.latitude,
         longitude=source.longitude,
         map_hidden=source.map_hidden,
+        owner_contact_hidden=source.owner_contact_hidden,
         price=source.price,
         pricing_type=source.pricing_type,
         price_range=source.price_range,
@@ -136,6 +142,16 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
         source_checksum=checksum,
         unknown_source_fields=source.unknown_field_names,
     )
+
+
+def _valid_contact(contact_type: str, value: str) -> bool:
+    if contact_type == "email":
+        return bool(EMAIL_PATTERN.fullmatch(value))
+    if contact_type in {"phone", "phone_2", "fax"}:
+        return bool(PHONE_PATTERN.fullmatch(value))
+    if contact_type == "website":
+        return value.startswith("https://")
+    return False
 
 
 def to_summary(listing: NormalizedListing) -> ListingSummary:

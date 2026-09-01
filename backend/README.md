@@ -33,3 +33,26 @@ injected through a protocol; unknown categories remain pending and incompatible 
 mappings fail safely. Currency remains null, `price=0` is preserved without interpretation,
 hidden contacts are discarded, and visible contacts never appear in summaries. Upstream
 HTML is sanitized with a small allowlist before normalization.
+
+## Gate 5A offline-testable catalogue synchronization
+
+`python -m app.jobs.sync_directorist` is the explicit one-shot entry point. It validates
+that `DATABASE_URL` is the dedicated local `ehs_mall_dev` database before connecting, then
+uses one database connection for the complete job and its PostgreSQL session advisory lock.
+The command performs real read-only Directorist GET requests when invoked, so it must not be
+run without separate approval for the configured source. Gate 5A verification uses fakes,
+HTTPX mock transports, and only the guarded `ehs_mall_test` database; it makes no live HTTP
+request.
+
+The job exit codes are `0` succeeded, `2` lock-held/skipped, `3` partial, `10`
+configuration failure, `11` database/migration failure, `12` upstream failure, and `13`
+unexpected controlled failure. A page commits atomically, invalid members use savepoints
+and safe error codes, and only a complete failure-free traversal marks unseen Directorist
+listings unavailable. The stable advisory-lock key is `499164875001`. Taxonomy discovery
+updates name snapshots while preserving pending, approved, or rejected decisions; it never
+matches names automatically.
+
+The existing `last_synced_at` column is the observation marker. Changed normalized records
+replace only source-owned relations and the latest sanitized payload; unchanged records
+only refresh observation state. Hidden contacts are omitted, hidden coordinates are removed
+from the stored payload, and only HTTPS media references are retained.

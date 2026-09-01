@@ -54,6 +54,7 @@ class NormalizedListing(BaseModel):
     latitude: Decimal | None
     longitude: Decimal | None
     map_hidden: bool
+    owner_contact_hidden: bool
     price: Decimal | None
     currency: None = None
     pricing_type: str | None

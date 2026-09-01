@@ -53,3 +53,29 @@ checks, safe pagination, redirect rejection, and no authorization/cookie configu
 Taxonomy mapping is injected rather than hard-coded. Currency stays unknown, zero price is
 uninterpreted, and contact visibility is enforced before public projection. No Gate 4
 command writes to WordPress or PostgreSQL.
+
+## Gate 5A synchronization verification
+
+The automated Gate 5A suite uses fake Directorist collections and the frozen synthetic
+fixture. It exercises transactional listing persistence only in `ehs_mall_test`, after the
+same exact database/role/local-host/different-URL guard used by the migration tests:
+
+```powershell
+backend/.venv/Scripts/python.exe -m pytest backend/tests
+```
+
+The installed one-shot entry point is:
+
+```powershell
+cd backend
+.venv/Scripts/python.exe -m app.jobs.sync_directorist
+```
+
+That command uses `ehs_mall_dev` and performs read-only network GETs against the configured
+Directorist host. Do not invoke it without explicit approval for both that database and
+source host. It never selects `TEST_DATABASE_URL`, never falls back between databases, and
+does not create or migrate schema. Run Alembic separately before an approved synchronization.
+
+Exit codes are: `0` success, `2` overlap skipped, `3` partial item failures, `10` unsafe or
+invalid configuration, `11` database failure, `12` Directorist failure, and `13` another
+controlled failure. Partial and failed runs never archive unseen listings.
