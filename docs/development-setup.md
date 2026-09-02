@@ -168,3 +168,34 @@ response data. Reported-page-limit enforcement remains enabled by default for th
 all existing callers. Only the fixed probe disables that metadata comparison; its
 `max_pages=1` request bound, page-one query, four-attempt ceiling, and every other pagination
 validation remain active. It does not authorize fetching another page.
+
+## Read-only catalogue API
+
+From `backend`, start the local FastAPI process with:
+
+```powershell
+.venv/Scripts/uvicorn.exe app.main:app --reload
+```
+
+OpenAPI is available at `http://127.0.0.1:8000/docs`. Public GET routes are
+`/api/v1/marketplaces`, `/api/v1/categories`, `/api/v1/locations`, `/api/v1/listings`, and
+`/api/v1/listings/{listing_id}`. The listing collection supports `page`, `per_page`, exact
+`marketplace`, `category`, and hierarchical `location` codes, bounded `q`, `featured`, and
+controlled `order_by`/`order` enums. Blank search is ignored; nonblank search must contain
+2–100 characters and searches only title, summary, and description. Unknown canonical
+filters produce an empty collection.
+
+The API exposes active, mapped listings only when their marketplace and primary category are
+active. Pending, archived, null-marketplace, and missing-primary-category rows are excluded
+before pagination. Example synthetic response:
+
+```json
+{"items": [], "page": 1, "per_page": 20, "total": 0, "total_pages": 0, "has_next": false, "has_previous": false}
+```
+
+Public responses omit contact values, addresses, coordinates, source IDs, WordPress
+author/plan IDs, internal mapping IDs, and payload data. `contact_available` is only a
+privacy-safe signal; contact display is deferred pending policy and consent review. Every
+catalogue request performs read-only migration/table readiness checks and closes its session.
+It never migrates at startup. Recurring synchronization remains disabled while operational
+checksum stability is unresolved.

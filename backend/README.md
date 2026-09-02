@@ -141,3 +141,28 @@ enforcement enabled by default. The probe alone disables that metadata compariso
 retaining `max_pages=1` as its request-page bound; it still performs four attempts and never
 requests another page. Missing, malformed, negative, contradictory, or undersized metadata
 continues to fail.
+
+## Public catalogue API
+
+Run the local API from `backend` with `uvicorn app.main:app --reload`; interactive OpenAPI
+documentation is at `/docs`. The read-only endpoints are `GET /api/v1/marketplaces`,
+`GET /api/v1/categories`, `GET /api/v1/locations`, `GET /api/v1/listings`, and
+`GET /api/v1/listings/{listing_id}`. Listing queries accept bounded page/per-page values,
+exact canonical marketplace/category/location codes, an optional 2–100 character public-text
+search, a featured flag, and fixed newest/title/rating plus asc/desc ordering enums.
+
+Only active listings with an active marketplace and active approved primary category are
+visible. Pending, archived, unclassified, null-marketplace, and incompletely classified
+records are excluded in SQL before pagination. Parent location filters include active
+descendants; unknown canonical filters consistently return empty collections. Responses use
+opaque EHS UUIDs and explicit public fields. They never contain contacts, addresses,
+coordinates, WordPress author/plan IDs, source IDs, mapping IDs, or payloads. Only a
+`contact_available` boolean is returned; displaying contact values remains deferred pending
+policy and consent review.
+
+For example, synthetic `GET /api/v1/listings?marketplace=construction` data has the shape
+`{"items": [], "page": 1, "per_page": 20, "total": 0, "total_pages": 0,
+"has_next": false, "has_previous": false}`. Each database request checks the exact Alembic
+head and required table inventory without migration or repair, uses a scoped synchronous
+session, and returns a controlled 503 if readiness fails. Recurring synchronization remains
+disabled because checksum stability has not yet been operationally proven.
