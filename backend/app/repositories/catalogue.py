@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
+from uuid import UUID
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.engine import CursorResult
@@ -42,11 +43,19 @@ class CatalogueRepository:
                 Listing.external_id == str(normalized.external_id),
             )
         )
-        approved = [
-            resolved
+        approved_by_id = {
+            resolved.category_id: resolved
             for source in normalized.categories
             if (resolved := resolver.category(source.external_id)) is not None
-        ]
+        }
+        approved = list(approved_by_id.values())
+        location_ids = list(
+            dict.fromkeys(
+                location_id
+                for source in normalized.locations
+                if (location_id := resolver.location_id(source.external_id)) is not None
+            )
+        )
         marketplace_ids = {item.marketplace_id for item in approved}
         if len(marketplace_ids) > 1:
             raise ValueError("classification_conflict")
@@ -57,6 +66,16 @@ class CatalogueRepository:
             if listing.status == "unavailable" and normalized.source_status == "publish":
                 listing.status = "active"
                 listing.archived_at = None
+            if self._classification_changed(
+                listing, marketplace_id, classification, approved, location_ids
+            ):
+                listing.marketplace_id = marketplace_id
+                listing.classification_status = classification
+                listing.updated_at = now
+                self._replace_categories(listing, approved)
+                self._replace_locations(listing, location_ids)
+                self.session.flush()
+                return UpsertResult("updated", classification == "pending")
             self.session.flush()
             return UpsertResult("unchanged", classification == "pending")
 
@@ -97,7 +116,7 @@ class CatalogueRepository:
             self.session.flush()
 
         self._replace_categories(listing, approved)
-        self._replace_locations(listing, normalized, resolver)
+        self._replace_locations(listing, location_ids)
         self._replace_media(listing, normalized)
         self._replace_contacts(listing, normalized)
         self._replace_payload(listing, normalized, now)
@@ -131,26 +150,53 @@ class CatalogueRepository:
                 )
             )
 
-    def _replace_locations(
-        self,
-        listing: Listing,
-        normalized: NormalizedListing,
-        resolver: DatabaseTaxonomyResolver,
-    ) -> None:
+    def _replace_locations(self, listing: Listing, location_ids: list[UUID]) -> None:
         self.session.execute(
             delete(ListingLocation).where(ListingLocation.listing_id == listing.id)
         )
-        location_ids = [
-            resolved
-            for source in normalized.locations
-            if (resolved := resolver.location_id(source.external_id)) is not None
-        ]
-        for index, location_id in enumerate(dict.fromkeys(location_ids)):
+        for index, location_id in enumerate(location_ids):
             self.session.add(
                 ListingLocation(
                     listing_id=listing.id, location_id=location_id, is_primary=index == 0
                 )
             )
+
+    def _classification_changed(
+        self,
+        listing: Listing,
+        marketplace_id: UUID | None,
+        classification: str,
+        approved: list[ApprovedCategory],
+        location_ids: list[UUID],
+    ) -> bool:
+        if (
+            listing.marketplace_id != marketplace_id
+            or listing.classification_status != classification
+        ):
+            return True
+        category_rows = set(
+            self.session.execute(
+                select(
+                    ListingCategory.category_id,
+                    ListingCategory.is_primary,
+                    ListingCategory.mapping_source,
+                ).where(ListingCategory.listing_id == listing.id)
+            )
+        )
+        desired_categories = {
+            (item.category_id, index == 0, "directorist") for index, item in enumerate(approved)
+        }
+        location_rows = set(
+            self.session.execute(
+                select(ListingLocation.location_id, ListingLocation.is_primary).where(
+                    ListingLocation.listing_id == listing.id
+                )
+            )
+        )
+        desired_locations = {
+            (location_id, index == 0) for index, location_id in enumerate(location_ids)
+        }
+        return category_rows != desired_categories or location_rows != desired_locations
 
     def _replace_media(self, listing: Listing, normalized: NormalizedListing) -> None:
         self.session.execute(delete(ListingMedia).where(ListingMedia.listing_id == listing.id))

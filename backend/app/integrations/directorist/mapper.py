@@ -1,12 +1,11 @@
 """Pure Directorist normalization; no database or network dependencies."""
 
-import json
 import re
-from hashlib import sha256
 from typing import Protocol
 
 import nh3
 
+from app.integrations.directorist.checksum import calculate_source_checksum
 from app.integrations.directorist.errors import DirectoristMappingError, DirectoristSchemaError
 from app.integrations.directorist.schemas import DirectoristListingV1
 from app.schemas.catalogue import (
@@ -68,6 +67,7 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
                 contacts.append(
                     NormalizedContact(contact_type=contact_type, value=str(raw).strip())
                 )
+    contacts.sort(key=lambda item: (item.contact_type, item.value.casefold()))
 
     media = [
         NormalizedMedia(
@@ -79,36 +79,21 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
         for item in sorted(source.images, key=lambda image: (image.position, image.id))
         if item.src.scheme == "https"
     ]
-    categories = [
-        TaxonomyRef(external_id=item.id, name=item.name, slug=item.slug)
-        for item in source.categories
-    ]
-    locations = [
-        TaxonomyRef(external_id=item.id, name=item.name, slug=item.slug)
-        for item in source.locations
-    ]
-    checksum_input = {
-        "external_id": source.id,
-        "title": source.name.strip(),
-        "slug": source.slug,
-        "source_url": str(source.permalink),
-        "status": source.status,
-        "modified": source.date_modified_gmt.isoformat() if source.date_modified_gmt else None,
-        "categories": [item.model_dump(mode="json") for item in categories],
-        "locations": [item.model_dump(mode="json") for item in locations],
-        "summary": plain_text(source.short_description),
-        "description": sanitize_html(source.description),
-        "tagline": plain_text(source.tagline, limit=200),
-        "price": str(source.price) if source.price is not None else None,
-        "pricing_type": source.pricing_type,
-        "media": [item.model_dump(mode="json") for item in media],
-        "contacts": [item.model_dump(mode="json") for item in contacts],
-        "owner_contact_hidden": source.owner_contact_hidden,
-    }
-    checksum = sha256(
-        json.dumps(checksum_input, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-    return NormalizedListing(
+    categories = sorted(
+        [
+            TaxonomyRef(external_id=item.id, name=item.name, slug=item.slug)
+            for item in source.categories
+        ],
+        key=lambda item: (item.external_id, item.slug or "", item.name),
+    )
+    locations = sorted(
+        [
+            TaxonomyRef(external_id=item.id, name=item.name, slug=item.slug)
+            for item in source.locations
+        ],
+        key=lambda item: (item.external_id, item.slug or "", item.name),
+    )
+    normalized = NormalizedListing(
         external_id=source.id,
         title=source.name.strip(),
         slug=source.slug,
@@ -139,9 +124,10 @@ def map_listing(source: DirectoristListingV1, resolver: TaxonomyResolver) -> Nor
         is_new=source.new,
         average_rating=source.average_rating,
         rating_count=source.rating_count,
-        source_checksum=checksum,
+        source_checksum="",
         unknown_source_fields=source.unknown_field_names,
     )
+    return normalized.model_copy(update={"source_checksum": calculate_source_checksum(normalized)})
 
 
 def _valid_contact(contact_type: str, value: str) -> bool:

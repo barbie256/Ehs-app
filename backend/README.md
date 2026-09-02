@@ -60,9 +60,19 @@ replace only source-owned relations and the latest sanitized payload; unchanged 
 only refresh observation state. Hidden contacts are omitted, hidden coordinates are removed
 from the stored payload, and only HTTPS media references are retained.
 
-Follow-up reconciliation work must cover coordinate-only checksum changes and lock-release
-failure after an already-finalized run. Public contact display remains blocked on explicit
-consent and policy review.
+Directorist source checksums use version 2 of a pure canonical contract. Category, location,
+media, and contact collections are ordered by stable source identity; decimals and aware
+datetimes use canonical representations; and every persisted source-owned field has an
+explicit inclusion or exclusion decision. Resolver decisions and database identities remain
+outside the source checksum. Classification and canonical category/location relations are
+re-evaluated independently, so an approved, changed, removed, or rejected mapping can update
+classification without rewriting media, contacts, or the latest sanitized payload.
+
+The first approved synchronization after this checksum change is a controlled transition:
+existing version-1 checksums should update to version 2. A separately approved stability run
+must then report unchanged records when source content and classification are unchanged.
+Lock-release failure after an already-finalized run remains follow-up work. Public contact
+display remains blocked on explicit consent and policy review.
 
 ## Gate 5B-R1 durable read-only probe
 

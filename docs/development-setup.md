@@ -83,6 +83,15 @@ Exit codes are: `0` success, `2` overlap skipped, `3` partial item failures, `10
 invalid configuration, `11` database failure, `12` Directorist failure, and `13` another
 controlled failure. Partial and failed runs never archive unseen listings.
 
+Source reconciliation uses checksum contract version 2. It canonically sorts source-owned
+collections, normalizes decimal and timezone-aware datetime representations, and records an
+explicit checksum decision for every normalized field. Database mapping state is deliberately
+excluded: classification and canonical category/location relations are reconciled separately
+even when source content is unchanged. The first approved run after adopting version 2 is a
+one-time checksum transition and may update every existing Directorist listing. Follow it with
+a separately approved stability run; unchanged source and mapping state must then count as
+unchanged.
+
 ## Offline verification of the read-only probe
 
 Gate 5B-R1 adds a database-free probe module intended for a separately approved live dry
