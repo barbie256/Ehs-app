@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+npm-debug.log*

@@ -1,0 +1,1 @@
+import { Empty,Screen,TextLink } from '@/components/ui'; export default function NotFound(){return <Screen><Empty message="This page is unavailable." action={<TextLink href="/(tabs)" label="Return home"/>}/></Screen>}

@@ -1,0 +1,3 @@
+import { Tabs } from 'expo-router'; import { Text } from 'react-native'; import { colors,touch } from '@/theme';
+const Icon=({name}:{name:string})=><Text accessible={false}>{name}</Text>;
+export default function TabLayout(){return <Tabs screenOptions={{headerShown:false,tabBarActiveTintColor:colors.primary,tabBarStyle:{minHeight:60},tabBarItemStyle:{minHeight:touch.minimum}}}><Tabs.Screen name="index" options={{title:'Home',tabBarAccessibilityLabel:'Home tab',tabBarIcon:()=> <Icon name="⌂"/>}}/><Tabs.Screen name="explore" options={{title:'Explore',tabBarAccessibilityLabel:'Explore tab',tabBarIcon:()=> <Icon name="⌕"/>}}/><Tabs.Screen name="saved" options={{title:'Saved',tabBarAccessibilityLabel:'Saved tab',tabBarIcon:()=> <Icon name="♡"/>}}/></Tabs>}

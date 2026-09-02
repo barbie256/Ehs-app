@@ -1,0 +1,1 @@
+{"extends":"expo/tsconfig.base","compilerOptions":{"strict":true,"noUncheckedIndexedAccess":true,"paths":{"@/*":["./src/*"]},"types":["jest"]},"include":["src/**/*.ts","src/**/*.tsx","expo-env.d.ts",".expo/types/**/*.ts"]}
