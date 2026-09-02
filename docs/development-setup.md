@@ -33,6 +33,29 @@ Load the selected private URL into `ALEMBIC_DATABASE_URL` without printing it be
 `alembic upgrade head`. Run `python -m app.services.taxonomy_seed` only with the guarded
 development URL.
 
+The canonical seed creates four marketplaces, 46 country-independent categories, five roles,
+and the initial `africa` → `uganda` → `kampala` location hierarchy. Location slugs are stable
+codes, allowing other African countries and their child regions or cities to be added later
+without a schema change. Uganda is not a default: absent source location remains absent or
+pending, and currency is independent of location with no UGX default.
+
+After seeding, the one-shot development curation command is:
+
+```powershell
+cd backend
+.venv/Scripts/python.exe -m app.jobs.apply_initial_taxonomy_mappings
+```
+
+It contains exactly the approved 12-decision baseline: ten Directorist category approvals,
+the Kampala mapping through Africa/Uganda/Kampala, and rejection of the generic Business
+directory. It accepts no arbitrary IDs or targets. The complete inventory and all active
+canonical targets are validated before the all-or-nothing transaction; a matching second run
+is idempotent. It never contacts WordPress and does not directly reclassify listings.
+
+Applying decisions requires separate authorization, as does the subsequent classification
+synchronization. Checksum stability is unresolved, so recurring scheduling remains
+prohibited.
+
 Database tests fail closed unless `TEST_DATABASE_URL` names exactly `ehs_mall_test`, uses a
 local host and role `ehs_mall_local`, and differs from `DATABASE_URL`. They rehearse
 base→head→base→head. Never point tests at development, production, Neon, MPU, or unrelated

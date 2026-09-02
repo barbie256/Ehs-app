@@ -6,9 +6,9 @@ application startup never calls `create_all()` and never upgrades automatically.
 
 The four revisions are `0001_identity_foundation`, `0002_canonical_taxonomy`,
 `0003_sources_and_catalogue`, and `0004_sync_and_audit`. The explicit seed command is
-`python -m app.services.taxonomy_seed`. It creates four marketplaces, 44 scoped categories,
-and five roles, but no users, vendors, or listings. Reruns preserve administrator-edited
-display names.
+`python -m app.services.taxonomy_seed`. It creates four marketplaces, 46 scoped categories,
+the Africa → Uganda → Kampala location hierarchy, and five roles, but no users, vendors, or
+listings. Reruns preserve administrator-edited display names.
 
 Source identity is typed: listings and vendors carry `source_system` and `external_id`,
 while `source_taxonomy_mappings` owns directory/category/location identities. There is no
@@ -73,6 +73,27 @@ existing version-1 checksums should update to version 2. A separately approved s
 must then report unchanged records when source content and classification are unchanged.
 Lock-release failure after an already-finalized run remains follow-up work. Public contact
 display remains blocked on explicit consent and policy review.
+
+## Initial taxonomy curation
+
+The canonical seed adds `energy_solutions` and `building_materials` to Construction. Location
+slugs are stable codes: `africa` is the root, `uganda` is its child, and `kampala` is a child
+of Uganda. This is an extensible hierarchy, not a default-country rule: future African
+countries and their regions or cities are added by stable code, while missing listing
+locations remain missing or pending. Categories remain country-independent, and currency is
+never inferred from location or defaulted to UGX.
+
+`python -m app.jobs.apply_initial_taxonomy_mappings` is a development-only, database-only
+curation command. It accepts no runtime mapping input and applies exactly the committed 12
+human decisions: ten category approvals, Kampala's location approval, and rejection of the
+generic Business directory. It validates the complete source ID/name inventory, active
+canonical targets, marketplace ownership, and the exact Africa/Uganda/Kampala path before
+changing anything; all decisions commit together or none do. Run the canonical seed first.
+Rerunning an already matching decision set is unchanged.
+
+The curation command does not reclassify listings. A separate explicitly authorized
+synchronization is required afterward. Checksum stability remains unresolved, so recurring
+or scheduled synchronization remains prohibited.
 
 ## Gate 5B-R1 durable read-only probe
 

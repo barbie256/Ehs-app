@@ -38,7 +38,12 @@ def test_01_upgrade_downgrade_upgrade_rehearsal(test_database_engine: Engine) ->
         second = seed_canonical_taxonomy(session)
         session.commit()
         assert first == second
-        assert (second.marketplaces, second.categories, second.roles) == (4, 44, 5)
+        assert (second.marketplaces, second.categories, second.locations, second.roles) == (
+            4,
+            46,
+            3,
+            5,
+        )
         assert session.scalar(select(func.count()).select_from(User)) == 0
         assert session.scalar(select(func.count()).select_from(Vendor)) == 0
         assert session.scalar(select(func.count()).select_from(Listing)) == 0
@@ -91,7 +96,12 @@ def test_03_seed_is_idempotent_and_non_creating(test_database_engine: Engine) ->
         second = seed_canonical_taxonomy(session)
         session.commit()
         assert first == second
-        assert (second.marketplaces, second.categories, second.roles) == (4, 44, 5)
+        assert (second.marketplaces, second.categories, second.locations, second.roles) == (
+            4,
+            46,
+            3,
+            5,
+        )
         assert session.scalar(select(func.count()).select_from(User)) == 0
         assert session.scalar(select(func.count()).select_from(Vendor)) == 0
         assert session.scalar(select(func.count()).select_from(Listing)) == 0
