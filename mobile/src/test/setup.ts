@@ -1,3 +1,3 @@
 import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
 jest.mock('@react-native-async-storage/async-storage',()=>mockAsyncStorage);
-jest.mock('expo-router',()=>({useRouter:()=>({push:jest.fn()}),Link:({children}:any)=>children,useLocalSearchParams:()=>({})}));
+jest.mock('expo-router',()=>({useRouter:()=>({push:jest.fn()}),usePathname:()=> '/',Link:({children}:any)=>children,useLocalSearchParams:()=>({})}));
