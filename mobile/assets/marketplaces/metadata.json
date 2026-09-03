@@ -1,0 +1,6 @@
+{
+  "property": { "file": "property.jpg", "format": "JPEG", "width": 720, "height": 713, "bytes": 73287, "sha256": "ec6f1637c03b817abd9f2d082d398e85b69466b43e21e5bdb35dedf52c3d5065" },
+  "construction": { "file": "construction.jpg", "format": "JPEG", "width": 736, "height": 1318, "bytes": 106400, "sha256": "8bdce5a721b067bfa6c450481be75d925040adf1444e8c6d7fe264eb3f7264ae" },
+  "home_interior": { "file": "home-interior.jpg", "format": "JPEG", "width": 736, "height": 1104, "bytes": 61471, "sha256": "e6a8f9259bf60e18d10bf6918e441918331dc99bb72ace07ee9dd1d0b395e967" },
+  "professional_services": { "file": "professional-services.jpg", "format": "JPEG", "width": 736, "height": 736, "bytes": 54400, "sha256": "67e1b7c3e9f1acba7ac51e73bdb6c8ba3430ffd0e4b65dce5b05c534f3f12519" }
+}

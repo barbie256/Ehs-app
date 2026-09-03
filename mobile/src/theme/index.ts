@@ -8,7 +8,7 @@ export const colors = {
 } as const;
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48, xxxl: 64 } as const;
 export const radii = { sm: 8, md: 14, lg: 22, xl: 30, pill: 999 } as const;
-export const type = { display: 42, hero: 34, title: 26, heading: 20, body: 16, small: 14, label: 12 } as const;
+export const type = { display: 42, displaySmall: 32, hero: 34, title: 26, heading: 20, body: 16, small: 14, label: 12 } as const;
 export const touch = { minimum: 44 } as const;
 export const layout = { maxContentWidth: 1200, phone: 600, desktop: 1024 } as const;
 export type LayoutMode = 'phone' | 'tablet' | 'desktop';
