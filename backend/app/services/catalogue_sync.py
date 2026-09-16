@@ -20,7 +20,7 @@ from app.services.taxonomy_resolver import DatabaseTaxonomyResolver
 class SyncSource(Protocol):
     async def get_directories(self) -> list[dict[str, Any]]: ...
 
-    async def get_categories(self) -> list[dict[str, Any]]: ...
+    async def get_all_categories(self, per_page: int) -> list[dict[str, Any]]: ...
 
     async def get_locations(self) -> list[dict[str, Any]]: ...
 
@@ -185,7 +185,7 @@ class CatalogueSyncService:
             tuple[Literal["directory", "category", "location"], list[dict[str, Any]]]
         ] = [
             ("directory", await self.source.get_directories()),
-            ("category", await self.source.get_categories()),
+            ("category", await self.source.get_all_categories(self.page_size)),
             ("location", await self.source.get_locations()),
         ]
         return {

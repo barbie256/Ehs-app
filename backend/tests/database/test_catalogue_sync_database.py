@@ -39,7 +39,7 @@ class FakeSource:
     async def get_directories(self) -> list[dict[str, Any]]:
         return [{"id": 3, "name": "Synthetic Directory"}]
 
-    async def get_categories(self) -> list[dict[str, Any]]:
+    async def get_all_categories(self, per_page: int) -> list[dict[str, Any]]:
         return [{"id": 29, "name": "Cement snapshot"}]
 
     async def get_locations(self) -> list[dict[str, Any]]:

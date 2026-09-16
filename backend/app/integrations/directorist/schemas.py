@@ -97,6 +97,17 @@ class DirectoristListingV1(SourceModel):
     links: dict[str, Any] | None = Field(default=None, alias="_links")
 
 
+class DirectoristCategoryPage(BaseModel):
+    """Validated category pagination metadata; records stay private to discovery."""
+
+    items: list[dict[str, Any]]
+    current_page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+    next_page: int | None
+
+
 class DirectoristPage(BaseModel):
     items: list[DirectoristListingV1]
     current_page: int

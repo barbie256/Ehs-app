@@ -25,6 +25,7 @@ from app.integrations.directorist.errors import (
     PaginationReason,
 )
 from app.integrations.directorist.schemas import (
+    DirectoristCategoryPage,
     DirectoristListingV1,
     DirectoristPage,
     DirectoristValidatedPage,
@@ -180,6 +181,71 @@ class DirectoristClient:
 
     async def get_categories(self) -> list[dict[str, Any]]:
         return await self._get_collection("/listings/categories")
+
+    async def get_categories_page(self, page: int, per_page: int) -> DirectoristCategoryPage:
+        """Read a fixed category page, rejecting incomplete or contradictory metadata."""
+        if type(page) is not int or not 1 <= page <= self._max_pages:
+            raise DirectoristPaginationError("category page is outside configured bounds")
+        if type(per_page) is not int or not 1 <= per_page <= self._max_page_size:
+            raise DirectoristPaginationError("category page size is outside configured bounds")
+        response, payload = await self._get(
+            "/listings/categories", {"page": page, "per_page": per_page}
+        )
+        if not isinstance(payload, list) or not all(isinstance(item, dict) for item in payload):
+            raise DirectoristResponseFormatError("category collection must be an array of objects")
+        metadata: list[int] = []
+        for header in ("X-WP-Total", "X-WP-TotalPages"):
+            value = response.headers.get(header, "")
+            if not value or len(value) > 10 or not value.isascii() or not value.isdecimal():
+                raise DirectoristPaginationError("category pagination metadata is invalid")
+            number = int(value)
+            if number > MAX_SAFE_DIAGNOSTIC_INTEGER:
+                raise DirectoristPaginationError("category pagination metadata is outside bounds")
+            metadata.append(number)
+        total, pages = metadata
+        expected_pages = (total + per_page - 1) // per_page
+        if (
+            pages > self._max_pages
+            or (total > 0 and pages != expected_pages)
+            or (total == 0 and pages not in {0, 1})
+            or page > max(pages, 1)
+            or len(payload) != min(per_page, max(0, total - (page - 1) * per_page))
+        ):
+            raise DirectoristPaginationError("category pagination is inconsistent or incomplete")
+        identities: set[int] = set()
+        for item in payload:
+            identity = item.get("id")
+            if type(identity) is not int or identity <= 0:
+                raise DirectoristResponseFormatError("category identity is invalid")
+            if identity in identities:
+                raise DirectoristPaginationError("category identities are duplicated")
+            identities.add(identity)
+        return DirectoristCategoryPage(
+            items=payload,
+            current_page=page,
+            page_size=per_page,
+            total_items=total,
+            total_pages=pages,
+            next_page=page + 1 if page < pages else None,
+        )
+
+    async def get_all_categories(self, per_page: int) -> list[dict[str, Any]]:
+        """Return categories only after a bounded, consistent traversal completes."""
+        first = await self.get_categories_page(1, per_page)
+        items = list(first.items)
+        seen = {item["id"] for item in items}
+        for number in range(2, first.total_pages + 1):
+            page = await self.get_categories_page(number, per_page)
+            if (page.total_items, page.total_pages) != (first.total_items, first.total_pages):
+                raise DirectoristPaginationError("category pagination changed during traversal")
+            for item in page.items:
+                if item["id"] in seen:
+                    raise DirectoristPaginationError("category identities repeat across pages")
+                seen.add(item["id"])
+                items.append(item)
+        if len(items) != first.total_items:
+            raise DirectoristPaginationError("category traversal is incomplete")
+        return items
 
     async def get_locations(self) -> list[dict[str, Any]]:
         return await self._get_collection("/listings/locations")

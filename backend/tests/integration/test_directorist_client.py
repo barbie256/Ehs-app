@@ -400,6 +400,8 @@ def test_bounds_and_public_surface_are_get_only() -> None:
         "get_listing",
         "get_directories",
         "get_categories",
+        "get_categories_page",
+        "get_all_categories",
         "get_locations",
     }
 
